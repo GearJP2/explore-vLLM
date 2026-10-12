@@ -1,161 +1,111 @@
-# First vLLM contribution: HTTP keep-alive configuration
+# Explore vLLM — Learning & Contribution Roadmap
 
-## Learning notes
+บันทึกการเรียนรู้ vLLM และ llm-d ผ่านการอ่านโค้ด ทดลอง และ contribute
+เริ่มจาก CLI configuration แล้วค่อยเข้าไปถึง inference, KV cache และระบบ serving หลายเครื่อง
+ใช้ CPU เป็นหลัก และใช้ cloud GPU เมื่อจำเป็นต้องตรวจพฤติกรรมจริง
 
-- [เรียนรู้ก่อนทำ llm-d #1525: P/D disaggregation และ request draining](docs/llm-d-request-draining-study.md)
-  — พื้นฐาน tensor, KV cache, parallelism, Kubernetes shutdown และแผนอ่านโค้ดพร้อมคำถามทบทวน
+อัปเดตบันทึก: 12 ตุลาคม 2026
 
-The original contribution plan below is a historical preparation note; its status
-statements describe the planning stage, not the current PR status.
+## ตอนนี้เราอยู่ตรงไหน
 
-Selected task under [vLLM #25700](https://github.com/vllm-project/vllm/issues/25700):
-expose HTTP idle keep-alive timeout through the Python frontend CLI and migrate
-its environment-variable configuration consistently across the serving paths.
+**กำลังศึกษา P/D disaggregation และ request draining ก่อนเลือกขอบเขตงานใน llm-d #1525**
 
-Status: selection and code-path investigation complete; implementation and
-runtime tests have not started. No GitHub comment or PR has been posted.
+PR แรกเขียน ทดสอบ และเปิดส่งแล้ว ส่วนงาน llm-d ยังอยู่ช่วงเรียนรู้และตามโค้ด
+ยังไม่ได้ยืนยันบั๊กหรือเริ่ม patch สำหรับ P/D shutdown
+สถานะในหน้านี้เป็นความคืบหน้าของเรา ไม่ใช่สถานะ review/merge แบบสดจาก upstream
 
-## Why this task
+📖 เริ่มอ่าน: [คู่มือภาษาไทย — พื้นฐานก่อนทำ request draining](docs/llm-d-request-draining-study.md)
 
-The Python API and render servers read `VLLM_HTTP_TIMEOUT_KEEP_ALIVE` directly.
-The standalone Rust frontend already exposes `--http-timeout-keep-alive`.
-Python's Rust-process launcher explicitly forwards the environment value in its
-JSON payload, so merely adding a Python CLI field would still leave an override
-bug in that path.
+## Roadmap
 
-The contribution should make this serving option discoverable in Python's CLI
-and YAML configuration and apply the resolved value consistently. This teaches
-argument parsing, configuration precedence, server launch, and subprocess
-configuration without requiring model inference or GPU kernels.
+| ช่วง | สิ่งที่เรียน/ทำ | ความคืบหน้า |
+| --- | --- | --- |
+| 1. รู้จัก repo และเลือกงาน | อ่าน issue, เช็กงานซ้ำ, เลือกงานที่ทดลองบน CPU ได้ | ทำแล้ว |
+| 2. CLI และ configuration | FrontendArgs → parser → args → consumers, YAML/env precedence | เรียนและใช้ใน PR แรกแล้ว |
+| 3. Contribution แรก | เพิ่ม HTTP keep-alive CLI config พร้อม compatibility และ tests | เปิด PR แล้ว |
+| 4. พื้นฐาน inference | Tensor, weights, prefill/decode, KV cache, TP และ replicas | เรียนเบื้องต้นแล้ว กำลังทบทวน |
+| 5. ระบบ P/D และ shutdown | Deployment, KV transfer, cache lifetime และ signal handling | กำลังอ่านโค้ด |
+| 6. ระบุงานถัดไป | ตรวจ version, งานที่มีคนทำแล้ว และหาช่องว่างที่พิสูจน์ได้ | ยังต้องทำ |
+| 7. ทดลองและ contribute | Reproduce → patch → validation → review → PR | หลังยืนยันขอบเขตงาน |
 
-HTTP keep-alive here means the time an **idle connection between requests** may
-remain open. It is not the maximum generation time, an engine startup timeout,
-or the interval for SSE heartbeat comments during streaming.
+## Contribution แรก: HTTP keep-alive configuration
 
-## Checkout and tools
+- Issue หลัก: [vLLM #25700](https://github.com/vllm-project/vllm/issues/25700)
+- PR ของเรา: [vLLM #60459](https://github.com/vllm-project/vllm/pull/60459)
+- Implementation commit: [`690946a`](https://github.com/GearJP2/vllm/commit/690946a0145a0940be5748b89b7760d500e5711b)
 
-- Independent upstream checkout: `vllm/` (ignored by this parent repository).
-- Inspected upstream commit: `54d93af9fb89d0bb8392bdb72db42bb6a17cb4ca`.
-- Inspection date: 2026-10-05.
-- Python 3.12 virtual environment: `vllm/.venv/`.
-- Installed `requirements/lint.txt` and pre-commit hooks.
-- Full vLLM/test dependencies are not installed. Hooks have not been run.
+สิ่งที่ทำแล้ว:
 
-Follow `vllm/AGENTS.md`: use `uv` and `.venv/bin/python` for Python work.
-On this workspace use `UV_CACHE_DIR=/tmp/vllm-uv-cache` and
-`PRE_COMMIT_HOME=/tmp/vllm-pre-commit` to keep tool caches writable.
+- [x] ไล่ `VLLM_HTTP_TIMEOUT_KEEP_ALIVE` และ consumers ที่เกี่ยวข้อง
+- [x] เพิ่ม `--http-timeout-keep-alive` ผ่าน CLI/YAML
+- [x] ส่งค่าที่ resolve แล้วไป Python API server, render server และ Rust frontend bootstrap
+- [x] เก็บ env fallback เพื่อรองรับ deployment เดิม โดย CLI > YAML > env > default 5 วินาที
+- [x] รองรับค่า 0 และปฏิเสธค่าติดลบ
+- [x] รัน focused CPU tests: 9 passed และ pre-commit ผ่าน
+- [x] เปิด PR และเปิดเผยการใช้ AI ช่วยทำงาน
 
-## Code-reading map
+สิ่งที่ได้เรียน: argument parsing, config precedence, การตาม consumer,
+การส่ง Python config ไป Rust ผ่าน JSON และ backward compatibility
+ขอบเขตสุดท้ายยังไม่ได้ประกาศ deprecation หรือลบ env var
 
-Read these in order inside `vllm/`:
+เก็บ [แผนก่อนเริ่มงาน](docs/http-keep-alive-original-plan.md) ไว้อ่านย้อนหลัง
+ข้อความสถานะและข้อเสนอในแผนเป็นข้อมูลตอนเตรียมงาน ไม่ใช่ผลลัพธ์สุดท้าย
 
-| File | What to follow |
+## หัวข้อปัจจุบัน: llm-d request draining
+
+- Issue ที่ศึกษา: [llm-d #1525](https://github.com/llm-d/llm-d/issues/1525)
+- งานก่อนหน้าที่ใช้อ่านประกอบ: [PR #2601](https://github.com/llm-d/llm-d/pull/2601)
+- ส่วนที่เลือกสำรวจ: `pd-disaggregation` — แยก prefill และ decode
+
+คำถามหลัก: **ถ้า prefill คำนวณจบ แต่ decode ยังอ่าน KV cache ไม่เสร็จ ระบบรออย่างไรก่อนปิด?**
+
+```text
+อ่าน deployment และ image
+    ↓
+เข้าใจ prefill → KV transfer → decode
+    ↓
+ตามการถือและคืน KV blocks
+    ↓
+ตาม SIGTERM → engine shutdown → connector cleanup
+    ↓
+ตรวจว่ามีช่องว่างจริง แล้วออกแบบการทดสอบ
+```
+
+สิ่งที่ทำแล้ว:
+
+- [x] ศึกษาความหมาย tensor, shape, weights และ tensor parallelism
+- [x] แยก prefill/decode และเข้าใจว่า KV cache ใช้ต่อระหว่าง decode
+- [x] ศึกษา graceful shutdown, SIGTERM, preStop และ termination grace period
+- [x] อ่านตัวอย่าง P/D config: producer/consumer, TP และ routing proxy
+- [x] อ่าน `request_finished()` และแนวคิดเลื่อนการคืน KV blocks
+- [x] รวบรวมแผนอ่านโค้ดและคำถามทบทวนในคู่มือ
+
+ขั้นถัดไป:
+
+- [ ] อ่านคู่มือบท 2–5 และลองตอบคำถามโดยไม่เปิดเฉลย
+- [ ] ตามว่า worker รายงาน `finished_sending` เมื่อไร รวมกรณี timeout/abort
+- [ ] ตามว่า engine shutdown นับงาน KV transfer ที่ค้างอยู่หรือไม่
+- [ ] ตรวจ vLLM image/version ของ overlay ให้ตรงกับโค้ดที่ศึกษา
+- [ ] ตรวจ manifests หลังรวม Kustomize และลำดับปิด proxy/modelserver
+- [ ] เช็ก PR ที่เกี่ยวข้องใหม่และตกลงส่วนงานที่ยังขาดก่อนเริ่ม contribution
+- [ ] ออกแบบการทดลอง CPU/GPU ตามพฤติกรรมที่ต้องพิสูจน์
+
+## เอกสารใน repo
+
+| เอกสาร | ใช้ทำอะไร |
 | --- | --- |
-| `vllm/envs.py` | Declaration, integer parser, default of 5 seconds, exclusion from compilation hash |
-| `vllm/entrypoints/launchers/cli_args.py` | `FrontendArgs`, generated CLI options, `validate_parsed_serve_args` |
-| `vllm/entrypoints/launchers/api_server/entry.py` | `build_and_serve` passes the timeout to Uvicorn |
-| `vllm/entrypoints/launchers/render/entry.py` | Equivalent path for the CPU-only rendering server |
-| `vllm/v1/utils.py` | `RustFrontendProcessManager` constructs the `--args-json` payload |
-| `rust/src/cmd/src/cli.rs` | Existing Rust CLI flag, environment fallback, and timeout resolution |
-| `examples/applications/api_server/server.py` | Separate example server also reads the environment variable |
-| `examples/disaggregated/disaggregated_encoder/disagg_epd_proxy.py` | Client pool timeout derives from the same environment variable |
+| [คู่มือ P/D และ request draining](docs/llm-d-request-draining-study.md) | อ่านพื้นฐาน ไล่โค้ด และทำคำถามทบทวนพร้อมเฉลย |
+| [แผน HTTP keep-alive เดิม](docs/http-keep-alive-original-plan.md) | เก็บเหตุผลและการสำรวจตอนเริ่ม contribution แรก |
+| [ร่าง issue comment](issue-comment-draft.md) | บันทึกร่างข้อความสำหรับงานแรก |
 
-Useful search:
+## วิธีเรียนและทำงานร่วมกัน
 
-```bash
-cd vllm
-rg -n 'VLLM_HTTP_TIMEOUT_KEEP_ALIVE|http_timeout_keep_alive|timeout_keep_alive' \
-  vllm rust examples tests docs
-```
+ตั้งคำถามหนึ่งข้อ → หาโค้ดที่เกี่ยวข้อง → อ่านช่วงสั้น ๆ → อธิบายด้วยภาษาตัวเอง
+→ ทดลองยืนยัน → ค่อยเสนอการแก้ไข
 
-## Proposed behavior and scope
+ให้ AI ช่วยค้นและอธิบายได้ แต่ก่อนส่ง PR ต้องอธิบายได้ว่าทำไมแก้ตรงนี้
+พฤติกรรมก่อน/หลังต่างกันอย่างไร และการทดสอบพิสูจน์อะไร
+การมีฟังก์ชันชื่อ `shutdown` ไม่ได้ยืนยันว่ารองานทุกประเภทครบแล้ว
 
-The intended user-facing result is:
-
-```bash
-vllm serve <model> --http-timeout-keep-alive 30
-```
-
-Or in a serving YAML config:
-
-```yaml
-http-timeout-keep-alive: 30
-```
-
-Keep the existing default of 5 seconds. Preserve zero as disabling idle
-connection reuse; reject negative values before launching the server.
-The CLI should override YAML consistently with other serving arguments.
-
-Before writing the patch, settle the environment compatibility policy. My
-recommended initial design is a deprecated fallback, with precedence
-`explicit CLI/YAML > legacy environment variable > 5`. This avoids silently
-changing existing deployments; it is a staged migration, not immediate removal
-of the variable. Check recent accepted migrations and maintainer preference
-before finalizing that policy. The related merged migration #55176 used removal,
-so a hard removal is also a precedent, not an automatic requirement here.
-
-Do not use `value or default`: zero is meaningful. Do not read a dynamic
-environment fallback into an import-time constant. The Rust launcher's existing
-environment assignment must not overwrite an explicit CLI/YAML value.
-
-The example proxy requires special care: it retires pooled connections before
-the backend's idle timeout, and uses `force_close` when that timeout is zero.
-If removing the environment variable, give the proxy an explicit way to receive
-the backend timeout and update its tests/documentation. Do not silently leave
-it assuming 5 seconds when the backend is configured differently.
-
-## CPU validation plan
-
-Use the existing test suites, with mocked engine/process boundaries where they
-already provide them. No model weights or cloud GPU should be needed for the
-core regression tests, although importing vLLM tests still requires its Python
-dependencies and a supported development installation.
-
-1. Extend `tests/entrypoints/launchers/test_cli_args.py`: defaults, zero,
-   positive values, negative rejection, YAML, CLI-over-YAML precedence, and
-   legacy-environment precedence if retaining compatibility.
-2. Extend `tests/entrypoints/launchers/api_server/test_api_server_process_manager.py`:
-   inspect the actual Rust subprocess JSON and ensure an explicit setting is
-   not replaced by the old environment value.
-3. Verify the API and renderer pass the configured value to the HTTP server,
-   without starting an inference engine. Prefer existing launcher fixtures.
-4. If modifying proxy configuration, extend
-   `tests/v1/ec_connector/unit/test_epd_proxy_retry.py` to preserve connection
-   retirement and zero-timeout behavior.
-5. Run a small local HTTP smoke check for idle connection behavior if needed;
-   GPU inference is unrelated to that contract.
-
-Test design: the contract is that the user's selected timeout reaches the
-server unchanged. The main failure to prevent is an override being ignored in
-one launch path, especially Python-to-Rust serialization. Check that contract
-at the argument/launcher boundary rather than testing model output.
-
-## Duplicate-work checks
-
-Read #25700 and its comments and searched GitHub for open PRs with:
-
-- `25700 in:body`
-- `VLLM_HTTP_TIMEOUT_KEEP_ALIVE`
-- `"http-timeout-keep-alive"` (including closed PRs for context)
-- `"keep alive"` and `"keep-alive" "config"`
-
-No direct competing migration was found in those results at inspection time.
-This does not establish ownership or maintainer acceptance. Recheck before
-starting the patch and before submission.
-
-`gh` is not installed here, so equivalent GitHub REST issue/comment/search
-endpoints were used. Relevant adjacent work:
-
-- [#18472](https://github.com/vllm-project/vllm/pull/18472): original environment-based configuration.
-- [#45890](https://github.com/vllm-project/vllm/pull/45890): Rust frontend HTTPS/mTLS work.
-- [#47840](https://github.com/vllm-project/vllm/pull/47840): open Rust HTTP body-limit work; different setting.
-- [#55176](https://github.com/vllm-project/vllm/pull/55176): scale-out endpoint environment-to-CLI migration.
-
-The Responses API store variable is already claimed in #25700; it was excluded.
-
-## Before submitting
-
-The human submitter must understand and review every changed line and run the
-relevant tests, as required by upstream `AGENTS.md`. Follow upstream's
-`.agents/skills/pr-checklist/SKILL.md` before submission and disclose AI
-assistance. This preparation is not a submitted or merge-ready contribution.
+`vllm/` เป็น checkout แยกที่ถูก ignore; clone repo นี้อย่างเดียวจะไม่ได้ source vLLM มาด้วย
+คู่มือมีลิงก์ GitHub ที่ตรึง revision เพื่อเปิดอ่านได้โดยไม่ต้องมี checkout ในเครื่อง
