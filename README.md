@@ -1,5 +1,13 @@
 # First vLLM contribution: HTTP keep-alive configuration
 
+## Learning notes
+
+- [เรียนรู้ก่อนทำ llm-d #1525: P/D disaggregation และ request draining](docs/llm-d-request-draining-study.md)
+  — พื้นฐาน tensor, KV cache, parallelism, Kubernetes shutdown และแผนอ่านโค้ดพร้อมคำถามทบทวน
+
+The original contribution plan below is a historical preparation note; its status
+statements describe the planning stage, not the current PR status.
+
 Selected task under [vLLM #25700](https://github.com/vllm-project/vllm/issues/25700):
 expose HTTP idle keep-alive timeout through the Python frontend CLI and migrate
 its environment-variable configuration consistently across the serving paths.
